@@ -128,6 +128,7 @@ export interface SettingsContainerProps {
     onRenderParametersUpdate: (settings: Partial<RenderParameters>) => void;
     onRenderFromMicrophone: () => void;
     onRenderFromFile: (file: ArrayBuffer) => void;
+    onRenderFromURL: (file: ArrayBuffer) => void;
 }
 
 export type SettingsContainer = (props: SettingsContainerProps) => JSX.Element;
@@ -140,14 +141,15 @@ function generateSettingsContainer(): [SettingsContainer, (playState: PlayState)
         onClearSpectrogram,
         onRenderParametersUpdate,
         onRenderFromMicrophone,
+        onRenderFromURL,
         onRenderFromFile,
     }: SettingsContainerProps) => {
         const { current: defaultParameters } = useRef({
             sensitivity: 0.5,
             contrast: 0.5,
-            zoom: 4,
+            zoom: 1,
             minFrequency: 10,
-            maxFrequency: 12000,
+            maxFrequency: 20000,
             scale: 'mel' as Scale,
             gradient: 'Heated Metal',
         });
@@ -162,6 +164,8 @@ function generateSettingsContainer(): [SettingsContainer, (playState: PlayState)
         const onInnerPaperClick = useCallback((e: MouseEvent) => e.stopPropagation(), []);
 
         const fileRef = useRef<HTMLInputElement | null>(null);
+//         code this in for now - we'll take this value from a different location 
+        const urlRef = 'https://mike-brady.github.io/demos/spectrogram-player/Eastern-Kingbird.wav';
 
         const [playState, setPlayState] = useState<PlayState>('stopped');
         const [SensitivitySlider, setSensitivity] = useMemo(generateLabelledSlider, []);
@@ -174,6 +178,13 @@ function generateSettingsContainer(): [SettingsContainer, (playState: PlayState)
             setPlayState('loading-mic');
             onRenderFromMicrophone();
         }, [onRenderFromMicrophone, setPlayState]);
+        
+        const onPlayURLClick = useCallback(() => {
+            setPlayState('loading-url');
+            onRenderFromURL();
+
+        }, [setPlayState]);
+
         const onPlayFileClick = useCallback(() => {
             if (fileRef.current === null) {
                 return;
@@ -317,7 +328,7 @@ function generateSettingsContainer(): [SettingsContainer, (playState: PlayState)
                     accept="audio/x-m4a,audio/*"
                     onChange={onFileChange}
                     ref={fileRef}
-                />
+                />                
                 <div className={classes.buttonContainer}>
                     <Button
                         fullWidth
@@ -332,6 +343,29 @@ function generateSettingsContainer(): [SettingsContainer, (playState: PlayState)
                     {playState === 'loading-file' && (
                         <CircularProgress size={24} className={classes.buttonProgress} />
                     )}
+                </div>
+
+                <div className={classes.buttonContainer}>
+                    <Button
+                        fullWidth
+                        variant="contained"
+                        color="primary"
+                        onClick={onPlayURLClick}
+                        startIcon={<AudiotrackIcon />}
+                        disabled={playState !== 'stopped'}
+                    >
+                        Play from URL
+                    </Button>
+                    {playState === 'loading-file' && (
+                        <CircularProgress size={24} className={classes.buttonProgress} />
+                    )}
+                <input
+                    type="url"
+                    style={{ display: 'none' }}
+                    accept="audio/x-m4a,audio/*"
+                    onChange={onFileChange}
+                    ref={fileRef}
+                />
                 </div>
 
                 <Button

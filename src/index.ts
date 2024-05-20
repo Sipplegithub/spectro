@@ -229,6 +229,10 @@ async function setupSpectrogramFromMicrophone(
     };
 }
 
+
+
+  
+
 async function setupSpectrogramFromAudioFile(
     audioCtx: AudioContext,
     arrayBuffer: ArrayBuffer,
@@ -303,6 +307,84 @@ async function setupSpectrogramFromAudioFile(
     };
 }
 
+
+
+
+async function setupSpectrogramFromURL(
+    audioCtx: AudioContext,
+    arrayBuffer: ArrayBuffer,
+    bufferCallback: (bufferData: SpectrogramBufferData[]) => Promise<Float32Array[]>,
+    audioEndCallback: () => void
+) {
+
+    let response = await fetch('https://mike-brady.github.io/demos/spectrogram-player/Eastern-Kingbird.wav')
+    const audioBuffer = response.arrayBuffer()
+    
+    let channelData: Float32Array[] = [];
+    for (let i = 0; i < audioBuffer.numberOfChannels; i += 1) {
+        channelData.push(new Float32Array(audioBuffer.getChannelData(i)));
+    }
+
+    const source = audioCtx.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(audioCtx.destination);
+    let isStopping = false;
+    const playStartTime = performance.now();
+    let nextSample = 0;
+
+    const audioEventCallback = async () => {
+        const duration = (performance.now() - playStartTime) / 1000;
+        const bufferCallbackData = [];
+
+        // Calculate spectrogram up to current point
+        const totalSamples =
+            Math.ceil((duration * audioBuffer.sampleRate - nextSample) / SPECTROGRAM_WINDOW_SIZE) *
+            SPECTROGRAM_WINDOW_SIZE;
+
+        if (totalSamples > 0) {
+            for (let i = 0; i < audioBuffer.numberOfChannels; i += 1) {
+                bufferCallbackData.push({
+                    buffer: channelData[i],
+                    start: nextSample,
+                    length: totalSamples,
+                    sampleRate: audioBuffer.sampleRate,
+                    isStart: nextSample === 0,
+                });
+            }
+
+            nextSample =
+                nextSample + totalSamples - SPECTROGRAM_WINDOW_SIZE + SPECTROGRAM_WINDOW_OVERLAP;
+            channelData = await bufferCallback(bufferCallbackData);
+        }
+
+        if (!isStopping && duration / audioBuffer.duration < 1.0) {
+            setTimeout(
+                audioEventCallback,
+                ((SPECTROGRAM_WINDOW_OVERLAP / audioBuffer.sampleRate) * 1000) / 2
+            );
+        } else {
+            source.disconnect(audioCtx.destination);
+            audioEndCallback();
+        }
+    };
+    audioEventCallback();
+
+    // Play audio
+    audioCtx.resume();
+    source.start(0);
+
+    // Return a function to stop rendering
+    return () => {
+        isStopping = true;
+        source.disconnect(audioCtx.destination);
+    };
+}
+
+
+
+
+
+
 const spectrogramCallbacksPromise = startRenderingSpectrogram();
 let globalAudioCtx: AudioContext | null = null;
 
@@ -340,11 +422,27 @@ let globalAudioCtx: AudioContext | null = null;
                     () => setPlayState('stopped')
                 );
             },
+            
             renderFromFileCallback: (file: ArrayBuffer) => {
                 if (globalAudioCtx === null) {
                     globalAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 }
                 setupSpectrogramFromAudioFile(globalAudioCtx, file, bufferCallback, () =>
+                    setPlayState('stopped')
+                ).then(
+                    (callback) => {
+                        stopCallback = callback;
+                        setPlayState('playing');
+                    },
+                    () => setPlayState('stopped')
+                );
+            },
+            
+            renderFromURLCallback: (file: ArrayBuffer) => {
+                if (globalAudioCtx === null) {
+                    globalAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                setupSpectrogramFromURL(globalAudioCtx, file, bufferCallback, () =>
                     setPlayState('stopped')
                 ).then(
                     (callback) => {
