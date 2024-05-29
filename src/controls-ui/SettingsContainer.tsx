@@ -216,10 +216,12 @@ function generateSettingsContainer(): [SettingsContainer, (playState: PlayState)
             });
             reader.readAsArrayBuffer(file);
         }, [fileRef, setPlayState, onRenderFromFile]);
+        
         const onStopClick = useCallback(() => {
             onStop();
             setPlayState('stopped');
         }, [setPlayState]);
+        
         const onSensitivityChange = useCallback(
             (value: number) => {
                 defaultParameters.sensitivity = value;
