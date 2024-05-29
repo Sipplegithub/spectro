@@ -359,13 +359,6 @@ function generateSettingsContainer(): [SettingsContainer, (playState: PlayState)
                     {playState === 'loading-file' && (
                         <CircularProgress size={24} className={classes.buttonProgress} />
                     )}
-                <input
-                    type="url"
-                    style={{ display: 'none' }}
-                    accept="audio/x-m4a,audio/*"
-                    onChange={onFileChange}
-                    ref={fileRef}
-                />
                 </div>
 
                 <Button
